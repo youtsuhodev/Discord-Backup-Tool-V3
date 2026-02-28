@@ -67,7 +67,21 @@ function selfbot_main(token){
 
     client.on('ready', () => {
         clearInterval(connexion_interval);
-        main_selfbot(client);
+        
+        // Animation de bienvenue
+        let welcomeDots = '';
+        let welcomeCounter = 0;
+        const welcomeInterval = setInterval(() => {
+            welcomeDots = '✨'.repeat(welcomeCounter % 4);
+            process.stdout.write(gradient(color())(`\r${' '.repeat(spaces)}Bonjour ${client.user.username}!${welcomeDots}   `));
+            welcomeCounter++;
+        }, 300);
+        
+        setTimeout(() => {
+            clearInterval(welcomeInterval);
+            console.log(gradient(color())(`\n${' '.repeat(spaces)}✅ Connecté en tant que ${client.user.username}#${client.user.discriminator}\n`));
+            main_selfbot(client);
+        }, 2000);
     });
 }
 
@@ -101,6 +115,7 @@ ${' '.repeat(spaces)}[8]  - Supprime Les Tickets (d'une Categorie)
 ${' '.repeat(spaces)}[9]  - Créé Un Modèle (Besoin de Permissions)
 ${' '.repeat(spaces)}[10] - Affiche La Liste Des Backups
 ${' '.repeat(spaces)}[11] - Settings
+${' '.repeat(spaces)}[12] - Tableau de bord des statistiques
 ${' '.repeat(spaces)}[0]  - Fermer`
     ))
   
@@ -122,21 +137,39 @@ ${' '.repeat(spaces)}[0]  - Fermer`
             case 1:
                 input.question(gradient(color())(' '.repeat(spaces) + `Entrez votre ID de serveur : `), async server_id => {
                     const guild = client.guilds.cache.get(server_id) || await client.guilds.fetch(server_id).catch(() => null);
-                    if (!guild) return error("Aucun serveur de trouvé");
+                    if (!guild) {
+                        error("Aucun serveur de trouvé", "Vérifiez l'ID du serveur et vos permissions");
+                        await sleep(2000);
+                        return main_selfbot(client);
+                    }
 
-                    console.log(gradient(color())(' '.repeat(spaces) + `Création de la backup de ${guild.name} en cours..`))
+                    info("Création de la backup", `Serveur: ${guild.name}`);
 
                     const created_backup = await selfbot_backup
                         .create(guild, { maxMessagesPerChannel: 0, doNotBackup: [ 'bans', 'emojis' ] })
                         .catch(() => null);
 
-                    if (!created_backup) return error("Création de la backup impossible");
+                    if (!created_backup) {
+                        error("Création de la backup impossible", "Vérifiez vos permissions ou la connexion");
+                        await sleep(2000);
+                        return main_selfbot(client);
+                    }
+                    
+                    // Sauvegarder le backup en fichier JSON
+                    const backupData = await selfbot_backup.fetch(created_backup.id);
+                    fs.writeFileSync(`./backups/selfbot/serveurs/${created_backup.id}.json`, JSON.stringify(backupData.data, null, 4));
                     
                     const new_guild = await client.guilds.create(guild.name).catch(() => false);
-                    if (!new_guild) return error('Création de serveur impossible');
+                    if (!new_guild) {
+                        error('Création de serveur impossible', 'Vous avez peut-être atteint la limite de serveurs');
+                        await sleep(2000);
+                        return main_selfbot(client);
+                    }
 
-                    console.log(gradient(color())(' '.repeat(spaces) + `Chargement de la backup de ${guild.name} en cours..`))
+                    info("Chargement de la backup", `Destination: ${guild.name}`);
                     await selfbot_backup.load(created_backup, new_guild);
+                    success("Backup créée et chargée avec succès!", `ID: ${created_backup.id}`);
+                    await sleep(2000);
                     main_selfbot(client);
                 })
                 break;
@@ -144,16 +177,30 @@ ${' '.repeat(spaces)}[0]  - Fermer`
             case 2:
                 input.question(gradient(color())(' '.repeat(spaces) + `Entrez votre ID de serveur : `), async server_id => {
                     const guild = client.guilds.cache.get(server_id) || await client.guilds.fetch(server_id).catch(() => null);
-                    if (!guild) return error("Aucun serveur de trouvé");
+                    if (!guild) {
+                        error("Aucun serveur de trouvé", "Vérifiez l'ID du serveur et vos permissions");
+                        await sleep(2000);
+                        return main_selfbot(client);
+                    }
 
-                    console.log(gradient(color())(' '.repeat(spaces) + `Création de la backup de ${guild.name} en cours..`))
+                    info("Création de la backup", `Serveur: ${guild.name}`);
 
                     const created_backup = await selfbot_backup
                         .create(guild, { maxMessagesPerChannel: 0, doNotBackup: [ 'bans', 'emojis' ] })
                         .catch(() => null);
 
-                    if (!created_backup) return error("Création de la backup impossible");
-                    input.question(gradient(color())(' '.repeat(spaces) + `Backup du serveur ${guild.name} crée: ${created_backup.id}\n${' '.repeat(spaces)}Appuyez sur entrer pour continuer`), () => main_selfbot(client));
+                    if (!created_backup) {
+                        error("Création de la backup impossible", "Vérifiez vos permissions ou la connexion");
+                        await sleep(2000);
+                        return main_selfbot(client);
+                    }
+                    
+                    // Sauvegarder le backup en fichier JSON
+                    const backupData = await selfbot_backup.fetch(created_backup.id);
+                    fs.writeFileSync(`./backups/selfbot/serveurs/${created_backup.id}.json`, JSON.stringify(backupData.data, null, 4));
+                    
+                    success("Backup créée avec succès!", `ID: ${created_backup.id}`);
+                    input.question(gradient(color())(' '.repeat(spaces) + `Appuyez sur entrer pour continuer`), () => main_selfbot(client));
                 })
                 break;
 
@@ -208,27 +255,47 @@ ${' '.repeat(spaces)}[0]  - Fermer`
             case 5:
                 input.question(gradient(color())(' '.repeat(spaces) + `Entrez votre ID de serveur : `), async server_id => {
                     const guild = client.guilds.cache.get(server_id) || await client.guilds.fetch(server_id).catch(() => null);
-                    if (!guild) return error("Aucun serveur de trouvé");
+                    if (!guild) {
+                        error("Aucun serveur de trouvé", "Vérifiez l'ID du serveur et vos permissions");
+                        await sleep(2000);
+                        return main_selfbot(client);
+                    }
 
                     input.question(gradient(color())(' '.repeat(spaces) + `Combien de messages par salons voulez-vous (max 100) : `), async maxMessagesPerChannel => {
                         const number = parseInt(maxMessagesPerChannel);
 
-                        if (number < 0 || number > 100) 
-                            return error("Veuillez entrer un nombre valide entre 0 et 100");
+                        if (number < 0 || number > 100) {
+                            error("Veuillez entrer un nombre valide entre 0 et 100");
+                            await sleep(2000);
+                            return main_selfbot(client);
+                        }
 
-                        console.log(gradient(color())(' '.repeat(spaces) + `Création de la backup de ${guild.name} avec ${number} messages par salons en cours..`))
+                        info("Création de la backup", `Serveur: ${guild.name} avec ${number} messages par salon`);
 
                         const created_backup = await selfbot_backup
                             .create(guild, { maxMessagesPerChannel: number, doNotBackup: [ 'bans', 'emojis' ] })
                             .catch(() => null);
 
-                        if (!created_backup) return error("Création de la backup impossible");
+                        if (!created_backup) {
+                            error("Création de la backup impossible", "Vérifiez vos permissions ou la connexion");
+                            await sleep(2000);
+                            return main_selfbot(client);
+                        }
+                        
+                        // Sauvegarder le backup en fichier JSON
+                        const backupData = await selfbot_backup.fetch(created_backup.id);
+                        fs.writeFileSync(`./backups/selfbot/serveurs/${created_backup.id}.json`, JSON.stringify(backupData.data, null, 4));
                         
                         const new_guild = await client.guilds.create(guild.name).catch(() => false);
-                        if (!new_guild) return error('Création de serveur impossible');
+                        if (!new_guild) {
+                            error('Création de serveur impossible', 'Vous avez peut-être atteint la limite de serveurs');
+                            await sleep(2000);
+                            return main_selfbot(client);
+                        }
 
-                        console.log(gradient(color())(' '.repeat(spaces) + `Chargement de la backup de ${guild.name} en cours..`))
+                        info("Chargement de la backup", `Destination: ${guild.name}`);
                         await selfbot_backup.load(created_backup, new_guild);
+                        success("Backup créée et chargée avec succès!", `ID: ${created_backup.id}`);
                         main_selfbot(client);
                     })
                 })
@@ -266,6 +333,11 @@ ${' '.repeat(spaces)}[0]  - Fermer`
                             console.log(gradient(color())(' '.repeat(spaces) + `Chargement de la backup en cours...`));
                             await selfbot_backup.load(backupId, guild);
                             input.question(gradient(color())(' '.repeat(spaces) + `Appuyez sur entrer pour continuer`), () => main_selfbot(client));
+                        }
+                        else {
+                            error("Aucune backup trouvée", `L'ID ${backupId} n'existe dans aucun dossier de backup`);
+                            await sleep(2000);
+                            main_selfbot(client);
                         }
                     })
                 })
@@ -369,6 +441,10 @@ ${' '.repeat(spaces)}[0]  - Fermer`
 
             case 11:
                 settings_menu(client);
+                break;
+
+            case 12:
+                show_stats_dashboard(client);
                 break;
         }
 
@@ -499,8 +575,8 @@ async function sleep(ms){
 
 /**
  * @returns {void}
- * @example logo();
  * @description Clear the console then display the logo
+ * @example logo();
 */
 function logo() {
     console.clear();
@@ -513,6 +589,119 @@ function logo() {
                 ╚═════╝ ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝ ╚═════╝ ╚═╝            ╚═╝    ╚═════╝  ╚═════╝ ╚══════╝`))
 }
 
+/**
+ * @param {string} message The success message to display
+ * @param {string} details Optional details about the success
+ * @description Display a success message with green color
+ * @example success("Backup created successfully!", "Backup ID: 12345");
+*/
+function success(message, details = "") {
+    const successGradient = gradient(['#00ff00', '#00cc00']);
+    console.log(successGradient(`${' '.repeat(spaces)}✅ ${message}`));
+    if (details) {
+        console.log(successGradient(`${' '.repeat(spaces)}   ${details}`));
+    }
+}
+
+/**
+ * @param {string} message The error message to display
+ * @param {string} details Optional details about the error
+ * @description Display an error message with red color
+ * @example error("Backup failed!", "Insufficient permissions");
+*/
+function error(message, details = "") {
+    const errorGradient = gradient(['#ff0000', '#cc0000']);
+    console.log(errorGradient(`${' '.repeat(spaces)}❌ ${message}`));
+    if (details) {
+        console.log(errorGradient(`${' '.repeat(spaces)}   ${details}`));
+    }
+}
+
+/**
+ * @param {string} message The warning message to display
+ * @param {string} details Optional details about the warning
+ * @description Display a warning message with yellow color
+ * @example warning("This action cannot be undone!", "Please confirm before proceeding");
+*/
+function warning(message, details = "") {
+    const warningGradient = gradient(['#ffff00', '#cccc00']);
+    console.log(warningGradient(`${' '.repeat(spaces)}⚠️  ${message}`));
+    if (details) {
+        console.log(warningGradient(`${' '.repeat(spaces)}   ${details}`));
+    }
+}
+
+/**
+ * @param {string} message The info message to display
+ * @param {string} details Optional details about the info
+ * @description Display an info message with blue color
+ * @example info("Processing backup...", "This may take a few minutes");
+*/
+function info(message, details = "") {
+    const infoGradient = gradient(['#0080ff', '#0060cc']);
+    console.log(infoGradient(`${' '.repeat(spaces)}ℹ️  ${message}`));
+    if (details) {
+        console.log(infoGradient(`${' '.repeat(spaces)}   ${details}`));
+    }
+}
+
+/**
+ * Affiche le tableau de bord des statistiques
+ * @param {Selfbot.Client} client The client of the selfbot
+ * @description Shows statistics dashboard with servers count, backups, disk usage
+ * @example show_stats_dashboard(client);
+*/
+function show_stats_dashboard(client) {
+    logo();
+    
+    // Calculer les statistiques
+    const serverCount = client.guilds.cache.size;
+    const serverBackups = fs.readdirSync('./backups/selfbot/serveurs/')
+        .filter(file => file.endsWith('.json')).length;
+    const emojiBackups = fs.readdirSync('./backups/selfbot/emojis/')
+        .filter(file => file.endsWith('.json')).length;
+    
+    // Calculer l'espace disque utilisé
+    function getFolderSize(folderPath) {
+        let totalSize = 0;
+        try {
+            const files = fs.readdirSync(folderPath);
+            for (const file of files) {
+                const filePath = `${folderPath}/${file}`;
+                const stats = fs.statSync(filePath);
+                if (stats.isDirectory()) {
+                    totalSize += getFolderSize(filePath);
+                } else {
+                    totalSize += stats.size;
+                }
+            }
+        } catch (err) {
+            return 0;
+        }
+        return totalSize;
+    }
+    
+    const backupSize = getFolderSize('./backups');
+    const backupSizeMB = (backupSize / (1024 * 1024)).toFixed(2);
+    
+    console.log(gradient(color())(`
+${' '.repeat(spaces)}📊 TABLEAU DE BORD DES STATISTIQUES
+${' '.repeat(spaces)}═══════════════════════════════════════════════════════════════
+
+${' '.repeat(spaces)}🏰 Serveurs disponibles:     ${serverCount}
+${' '.repeat(spaces)}💾 Backups de serveurs:     ${serverBackups}
+${' '.repeat(spaces)}😊 Backups d'emojis:        ${emojiBackups}
+${' '.repeat(spaces)}💿 Espace disque utilisé:    ${backupSizeMB} MB
+${' '.repeat(spaces)}📈 Total des backups:        ${serverBackups + emojiBackups}
+
+${' '.repeat(spaces)}═══════════════════════════════════════════════════════════════
+${' '.repeat(spaces)}👤 Utilisateur: ${client.user.username}#${client.user.discriminator}
+${' '.repeat(spaces)}🆔 User ID: ${client.user.id}
+${' '.repeat(spaces)}📅 Date: ${new Date().toLocaleDateString('fr-FR')}
+    `));
+    
+    input.question(gradient(color())(`\n${' '.repeat(spaces)}Appuyez sur entrer pour continuer`), () => main_selfbot(client));
+}
 
 /**
  * Connect the token to the tool
