@@ -259,7 +259,11 @@ ${' '.repeat(spaces)}[0]  - Fermer`
                                 input.question(gradient(color())(' '.repeat(spaces) + `Appuyez sur entrer pour continuer`), () => main_selfbot(client));
                             })
                         }
-                        else if (fs.existsSync(`./backups/selfbot/serveurs/${backupId}.json`)){
+                        else {
+                            const backupExists = await selfbot_backup.fetch(backupId).catch(() => null);
+                            if (!backupExists)
+                                return error("Aucune backup trouvée avec cet ID");
+
                             if (!guild.members.me.permissions.has("ADMINISTRATOR"))
                                 return error("Vous n'avez pas les permissions requises");
 
