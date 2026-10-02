@@ -13,6 +13,36 @@ const pipelineAsync = promisify(pipeline);
 const Selfbot = require('discord.js-selfbot-v13');
 const selfbot_backup = require('discord.js-backup-v13');
 
+// Patch: Discord's API rejects lowering verification_level to NONE (0) from a
+// user account ("Server verification level insufficient"). Retry as LOW, and
+// never let a single config setting abort the whole restore.
+const loadModule = require('discord.js-backup-v13/lib/load.js');
+loadModule.loadConfig = (guild, backupData) => {
+    const configPromises = [];
+    const safe = (promise) => promise.catch(err => {
+        console.warn(`[backup] Config setting skipped on ${guild.name}: ${err?.message ?? err}`);
+    });
+    if (backupData.name) configPromises.push(safe(guild.setName(backupData.name)));
+    if (backupData.iconBase64) configPromises.push(safe(guild.setIcon(Buffer.from(backupData.iconBase64, 'base64'))));
+    else if (backupData.iconURL) configPromises.push(safe(guild.setIcon(backupData.iconURL)));
+    if (backupData.splashBase64) configPromises.push(safe(guild.setSplash(Buffer.from(backupData.splashBase64, 'base64'))));
+    else if (backupData.splashURL) configPromises.push(safe(guild.setSplash(backupData.splashURL)));
+    if (backupData.bannerBase64) configPromises.push(safe(guild.setBanner(Buffer.from(backupData.bannerBase64, 'base64'))));
+    else if (backupData.bannerURL) configPromises.push(safe(guild.setBanner(backupData.bannerURL)));
+    if (backupData.verificationLevel) {
+        const level = typeof backupData.verificationLevel === 'number' && backupData.verificationLevel === 0 ? 1 : backupData.verificationLevel;
+        configPromises.push(safe(guild.setVerificationLevel(level === 'NONE' ? 'LOW' : level)));
+    }
+    if (backupData.defaultMessageNotifications) {
+        configPromises.push(safe(guild.setDefaultMessageNotifications(backupData.defaultMessageNotifications)));
+    }
+    const changeableExplicitLevel = guild.features.includes('COMMUNITY');
+    if (backupData.explicitContentFilter && changeableExplicitLevel) {
+        configPromises.push(safe(guild.setExplicitContentFilter(backupData.explicitContentFilter)));
+    }
+    return Promise.all(configPromises);
+};
+
 const config = require('./config.json');
 const gradient = require('gradient-string');
 
